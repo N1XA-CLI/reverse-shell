@@ -64,8 +64,7 @@ def _send_file(conn:socket.socket, file):
     """Send file to the conn. Takes conn and file."""
         
     with open(file, "rb") as f:
-
-        conn._send(base64.b64encode(f.read()).decode())
+        _send(conn, base64.b64encode(f.read()).decode())
 
     return
 
