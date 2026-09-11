@@ -12,13 +12,13 @@ class Client():
 
         while self.sock:
 
-            # if not utils._is_alive(self.sock):
-            #     self.connect("127.0.0.1", 4444)
-
             command = utils._receive(self.sock)
 
             if not command:
                 continue
+
+            if command == 'PING':
+                utils._send(self.sock, "PONG")
 
             elif "kill yourself" == command:
                 self.sock.close()

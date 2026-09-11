@@ -33,17 +33,16 @@ def _receive(conn:socket.socket):
 
 # Check if connection is alive or not
 
-# def _is_alive(conn:socket.socket):
+def _is_alive(conn: socket.socket):
+    try:
+        _send(conn, 'PING')
+        response = _receive(conn)
 
-#     try:
-#         response = _send(conn, b'PING')
-#     except (ConnectionRefusedError, OSError, socket.timeout):
-#         return False
-    
-#     if b'PONG' == response:
-#         return True
-    
-#     return False
+        return response == 'PONG'
+
+    except (ConnectionRefusedError, ConnectionResetError,
+            BrokenPipeError, socket.timeout, OSError):
+        return False
 
 # Excuting commands function
 
